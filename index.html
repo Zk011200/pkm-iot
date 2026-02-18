@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Monitoring Kelembaban Hidroponik</title>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --success: #22c55e;
+      --danger: #ef4444;
+    }
+
+    body { 
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+      background-color: var(--bg);
+      color: var(--text-main);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .header h2 { margin-bottom: 5px; color: var(--primary); }
+
+    .grid { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+      gap: 20px; 
+      width: 100%;
+      max-width: 900px; 
+    }
+
+    .card { 
+      background: var(--card-bg);
+      padding: 24px; 
+      border-radius: 16px; 
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card:hover { transform: translateY(-5px); }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 15px;
+    }
+
+    .val { 
+      font-size: 48px; 
+      font-weight: 800; 
+      margin: 10px 0;
+      color: var(--text-main);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      background: #fee2e2;
+      color: var(--danger);
+    }
+
+    .status-connected {
+      background: #dcfce7;
+      color: var(--success);
+    }
+
+    .meta { font-size: 13px; color: var(--text-muted); margin-top: 10px; }
+    
+    /* Warna Dinamis Water */
+    .status-on { color: var(--danger); } /* Pompa Nyala (Kering) */
+    .status-off { color: var(--success); } /* Pompa Mati (Lembab) */
+
+    .indicator {
+      height: 4px;
+      width: 100%;
+      background: #eee;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+    }
+
+    .indicator-active { background: var(--primary); }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>Monitoring Kelembaban</h2>
+    <div id="status-container" class="status-badge">
+      <span id="status-text">Connecting...</span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">
+        <i data-lucide="droplets" style="color: #0ea5e9;"></i>
+        Kelembaban Tanah
+      </div>
+      <div class="val" id="hum">--</div>
+      <div class="meta" id="hum_meta">Menunggu data...</div>
+      <div class="indicator indicator-active"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <i data-lucide="waves" style="color: #3b82f6;"></i>
+        Status Pompa Air
+      </div>
+      <div class="val" id="water">--</div>
+      <div class="meta" id="water_meta">Menunggu data...</div>
+      <div class="indicator" id="water_indicator"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    // Initialize Icons
+    lucide.createIcons();
+
+    const HOST = "wss://5d06ddf4798c4491a76b7055abe6e283.s1.eu.hivemq.cloud:8884/mqtt";
+    const USER = "wemos1";
+    const PASS = "We123123";
+
+    const TOPIC_HUM = "wemos1/iot/humidity";
+    const TOPIC_WATER = "wemos1/iot/water";
+
+    const client = mqtt.connect(HOST, {
+      username: USER,
+      password: PASS,
+      clientId: "web_client_" + Math.random().toString(16).slice(2),
+    });
+
+    const statusText = document.getElementById("status-text");
+    const statusContainer = document.getElementById("status-container");
+
+    client.on("connect", () => {
+      statusText.textContent = "Sistem Online";
+      statusContainer.classList.add("status-connected");
+      client.subscribe([TOPIC_HUM, TOPIC_WATER]);
+    });
+
+    client.on("reconnect", () => {
+      statusText.textContent = "Reconnecting...";
+      statusContainer.classList.remove("status-connected");
+    });
+
+    // Fungsi perbaikan tampilan ON/OFF
+    function updateWaterDisplay(value) {
+      const waterEl = document.getElementById("water");
+      const indicator = document.getElementById("water_indicator");
+      
+      // Mengatasi case-insensitive dan tipe data apa pun
+      let state = String(value).toUpperCase();
+
+      if (state === "ON" || value === 1 || value === true) {
+        waterEl.textContent = "ON";
+        waterEl.className = "val status-on";
+        indicator.style.backgroundColor = "var(--danger)";
+      } else if (state === "OFF" || value === 0 || value === false) {
+        waterEl.textContent = "OFF";
+        waterEl.className = "val status-off";
+        indicator.style.backgroundColor = "var(--success)";
+      } else {
+        waterEl.textContent = value ?? "--";
+        waterEl.className = "val";
+      }
+    }
+
+    client.on("message", (topic, message) => {
+      let rawPayload = message.toString();
+      let obj;
+      
+      try {
+        // Trik: Jika JSON tidak standar (ON tanpa kutip), kita perbaiki stringnya sebelum parse
+        let fixedPayload = rawPayload.replace(/:\s?(ON|OFF)([,\s}])/gi, ':"$1"$2');
+        obj = JSON.parse(fixedPayload);
+      } catch (e) {
+        console.error("Payload error:", rawPayload);
+        obj = null;
+      }
+
+      const now = new Date().toLocaleTimeString('id-ID');
+
+      if (topic === TOPIC_HUM) {
+        const h = obj?.humidity ?? "--";
+        const t = obj?.temp ?? "--";
+        document.getElementById("hum").textContent = h + (h !== "--" ? "%" : "");
+        document.getElementById("hum_meta").textContent = `Suhu: ${t}°C | Update: ${now}`;
+      }
+
+      if (topic === TOPIC_WATER) {
+        const w = obj?.water ?? obj?.state;
+        updateWaterDisplay(w);
+        document.getElementById("water_meta").textContent = `Device: ${obj?.device ?? "Unknown"} | Update: ${now}`;
+      }
+    });
+  </script>
+</body>
+</html>
