@@ -4,142 +4,418 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Monitoring Kelembaban Hidroponik</title>
+
+  <!-- Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Chart.js (grafik realtime) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
   <style>
-    :root {
-      --primary: #2563eb;
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --text-main: #1e293b;
-      --text-muted: #64748b;
-      --success: #22c55e;
-      --danger: #ef4444;
+    :root{
+      --bg0:#070a13;
+      --bg1:#0b1226;
+      --card: rgba(255,255,255,.06);
+      --card2: rgba(255,255,255,.08);
+      --border: rgba(255,255,255,.10);
+      --text:#e5e7eb;
+      --muted:#a3a3a3;
+
+      --primary:#60a5fa;
+      --accent:#22d3ee;
+
+      --success:#22c55e;
+      --danger:#ef4444;
+      --warn:#f59e0b;
+
+      --shadow: 0 18px 40px rgba(0,0,0,.35);
+      --radius: 18px;
     }
 
-    body { 
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-      background-color: var(--bg);
-      color: var(--text-main);
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      min-height:100vh;
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background:
+        radial-gradient(900px 600px at 10% 5%, rgba(34,211,238,.20), transparent 60%),
+        radial-gradient(900px 600px at 90% 15%, rgba(96,165,250,.22), transparent 60%),
+        radial-gradient(900px 600px at 50% 95%, rgba(34,197,94,.12), transparent 55%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      padding: 22px;
+      display:flex;
+      justify-content:center;
     }
 
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
+    .wrap{
+      width:100%;
+      max-width: 1040px;
     }
 
-    .header h2 { margin-bottom: 5px; color: var(--primary); }
-
-    .grid { 
-      display: grid; 
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
-      gap: 20px; 
-      width: 100%;
-      max-width: 900px; 
+    .topbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:14px;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom: 16px;
     }
 
-    .card { 
-      background: var(--card-bg);
-      padding: 24px; 
-      border-radius: 16px; 
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-      transition: transform 0.2s;
-      position: relative;
-      overflow: hidden;
+    .brand{
+      display:flex;
+      gap:12px;
+      align-items:center;
     }
 
-    .card:hover { transform: translateY(-5px); }
-
-    .card-title {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 600;
-      color: var(--text-muted);
-      margin-bottom: 15px;
+    .logo{
+      width:44px;
+      height:44px;
+      border-radius: 14px;
+      display:grid;
+      place-items:center;
+      background: linear-gradient(135deg, rgba(96,165,250,.35), rgba(34,211,238,.25));
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
     }
 
-    .val { 
-      font-size: 48px; 
-      font-weight: 800; 
-      margin: 10px 0;
-      color: var(--text-main);
+    h1{
+      margin:0;
+      font-size: 18px;
+      letter-spacing: .2px;
+      line-height: 1.1;
+    }
+    .sub{
+      margin:3px 0 0 0;
+      color: var(--muted);
+      font-size: 13px;
     }
 
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 12px;
-      border-radius: 20px;
+    .statusPill{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.05);
+      box-shadow: var(--shadow);
+      user-select:none;
+    }
+
+    .dot{
+      width:10px; height:10px;
+      border-radius: 999px;
+      background: var(--warn);
+      box-shadow: 0 0 0 6px rgba(245,158,11,.15);
+    }
+    .dot.on{
+      background: var(--success);
+      box-shadow: 0 0 0 6px rgba(34,197,94,.18);
+    }
+    .dot.offline{
+      background: var(--danger);
+      box-shadow: 0 0 0 6px rgba(239,68,68,.18);
+    }
+    .statusText{
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .statusMeta{
       font-size: 12px;
-      font-weight: bold;
-      background: #fee2e2;
-      color: var(--danger);
+      color: var(--muted);
     }
 
-    .status-connected {
-      background: #dcfce7;
-      color: var(--success);
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 14px;
+      margin-top: 14px;
     }
 
-    .meta { font-size: 13px; color: var(--text-muted); margin-top: 10px; }
-    
-    /* Warna Dinamis Water */
-    .status-on { color: var(--danger); } /* Pompa Nyala (Kering) */
-    .status-off { color: var(--success); } /* Pompa Mati (Lembab) */
+    .card{
+      background: linear-gradient(180deg, var(--card), var(--card2));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      position:relative;
+      overflow:hidden;
+    }
 
-    .indicator {
-      height: 4px;
+    .card::before{
+      content:"";
+      position:absolute; inset:-2px;
+      background: radial-gradient(700px 120px at 30% 0%, rgba(96,165,250,.25), transparent 55%);
+      pointer-events:none;
+      opacity:.8;
+    }
+
+    .cardInner{
+      position:relative;
+      padding: 18px 18px 16px;
+    }
+
+    .title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: .2px;
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .titleLeft{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+
+    .ico{
+      width:34px; height:34px;
+      border-radius: 12px;
+      display:grid;
+      place-items:center;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+    }
+
+    .val{
+      font-size: 44px;
+      font-weight: 900;
+      letter-spacing: .3px;
+      margin: 6px 0 2px;
+      line-height: 1.05;
+    }
+
+    .meta{
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    .chip{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .bar{
+      height: 5px;
       width: 100%;
-      background: #eee;
-      position: absolute;
-      bottom: 0;
-      left: 0;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      overflow:hidden;
+      margin-top: 14px;
     }
 
-    .indicator-active { background: var(--primary); }
+    .bar > span{
+      display:block;
+      height:100%;
+      width: 45%;
+      background: linear-gradient(90deg, rgba(34,211,238,.9), rgba(96,165,250,.9));
+      border-radius: 999px;
+      box-shadow: 0 0 18px rgba(34,211,238,.25);
+      transition: width .35s ease;
+    }
+
+    /* WATER state */
+    .stateBadge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing:.2px;
+      text-transform: uppercase;
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+    }
+
+    .stateBadge.on{
+      color: #fff;
+      background: rgba(239,68,68,.18);
+      border-color: rgba(239,68,68,.35);
+      box-shadow: 0 0 0 6px rgba(239,68,68,.10);
+    }
+    .stateBadge.off{
+      color: #0b1b10;
+      background: rgba(34,197,94,.20);
+      border-color: rgba(34,197,94,.35);
+      box-shadow: 0 0 0 6px rgba(34,197,94,.10);
+    }
+
+    .valWater.on{ color: var(--danger); text-shadow: 0 0 14px rgba(239,68,68,.20); }
+    .valWater.off{ color: var(--success); text-shadow: 0 0 14px rgba(34,197,94,.18); }
+
+    .barWater.on > span{
+      background: linear-gradient(90deg, rgba(239,68,68,.95), rgba(245,158,11,.85));
+      box-shadow: 0 0 18px rgba(239,68,68,.25);
+      width: 100%;
+    }
+    .barWater.off > span{
+      background: linear-gradient(90deg, rgba(34,197,94,.95), rgba(16,185,129,.85));
+      box-shadow: 0 0 18px rgba(34,197,94,.22);
+      width: 25%;
+    }
+
+    /* Layout */
+    .span6{ grid-column: span 6; }
+    .span12{ grid-column: span 12; }
+
+    @media (max-width: 900px){
+      .span6{ grid-column: span 12; }
+    }
+
+    /* Chart card */
+    .chartWrap{
+      height: 260px;
+      margin-top: 8px;
+    }
+
+    footer{
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align:center;
+      padding: 18px 0 6px;
+      opacity: .9;
+    }
+
+    a{ color: inherit; }
   </style>
 </head>
+
 <body>
+  <div class="wrap">
 
-  <div class="header">
-    <h2>Monitoring Kelembaban</h2>
-    <div id="status-container" class="status-badge">
-      <span id="status-text">Connecting...</span>
-    </div>
-  </div>
-
-  <div class="grid">
-    <div class="card">
-      <div class="card-title">
-        <i data-lucide="droplets" style="color: #0ea5e9;"></i>
-        Kelembaban Tanah
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo" title="IoT">
+          <i data-lucide="leaf"></i>
+        </div>
+        <div>
+          <h1>Monitoring Kelembaban Hidroponik</h1>
+          <div class="sub">Realtime via HiveMQ Cloud • Dashboard publik</div>
+        </div>
       </div>
-      <div class="val" id="hum">--</div>
-      <div class="meta" id="hum_meta">Menunggu data...</div>
-      <div class="indicator indicator-active"></div>
+
+      <div class="statusPill" title="Status MQTT">
+        <span id="dot" class="dot"></span>
+        <div>
+          <div id="statusText" class="statusText">Connecting…</div>
+          <div id="statusMeta" class="statusMeta">Menyiapkan koneksi</div>
+        </div>
+      </div>
     </div>
 
-    <div class="card">
-      <div class="card-title">
-        <i data-lucide="waves" style="color: #3b82f6;"></i>
-        Status Pompa Air
+    <div class="grid">
+
+      <!-- HUM CARD -->
+      <div class="card span6">
+        <div class="cardInner">
+          <div class="title">
+            <div class="titleLeft">
+              <div class="ico"><i data-lucide="droplets"></i></div>
+              Kelembaban Tanah
+            </div>
+            <span class="stateBadge" id="humBadge">LIVE</span>
+          </div>
+
+          <div class="val" id="hum">--</div>
+
+          <div class="meta">
+            <span class="chip"><i data-lucide="thermometer"></i> <span id="temp">--</span></span>
+            <span class="chip"><i data-lucide="clock"></i> <span id="humTime">Menunggu data…</span></span>
+            <span class="chip"><i data-lucide="wifi"></i> <span id="humTopic">wemos1/iot/humidity</span></span>
+          </div>
+
+          <div class="bar" aria-label="humidity bar">
+            <span id="humBar" style="width:0%"></span>
+          </div>
+        </div>
       </div>
-      <div class="val" id="water">--</div>
-      <div class="meta" id="water_meta">Menunggu data...</div>
-      <div class="indicator" id="water_indicator"></div>
+
+      <!-- WATER CARD -->
+      <div class="card span6">
+        <div class="cardInner">
+          <div class="title">
+            <div class="titleLeft">
+              <div class="ico"><i data-lucide="waves"></i></div>
+              Status Pompa Air
+            </div>
+            <span class="stateBadge" id="waterBadge">UNKNOWN</span>
+          </div>
+
+          <div class="val valWater" id="water">--</div>
+
+          <div class="meta">
+            <span class="chip"><i data-lucide="cpu"></i> <span id="waterDevice">Unknown</span></span>
+            <span class="chip"><i data-lucide="clock"></i> <span id="waterTime">Menunggu data…</span></span>
+            <span class="chip"><i data-lucide="wifi"></i> <span id="waterTopic">wemos1/iot/water</span></span>
+          </div>
+
+          <div class="bar barWater" id="waterBar" aria-label="water bar">
+            <span></span>
+          </div>
+
+          <div class="meta" style="margin-top:12px">
+            <span style="color:var(--muted)">
+              ON = terlalu kering → pompa/valve nyala • OFF = lembab → mati
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHART -->
+      <div class="card span12">
+        <div class="cardInner">
+          <div class="title">
+            <div class="titleLeft">
+              <div class="ico"><i data-lucide="line-chart"></i></div>
+              Grafik Humidity Realtime
+            </div>
+            <span class="stateBadge" id="chartBadge">LAST 60</span>
+          </div>
+          <div class="chartWrap">
+            <canvas id="humChart"></canvas>
+          </div>
+          <div class="meta">
+            <span class="chip"><i data-lucide="activity"></i> Auto update tiap pesan masuk</span>
+            <span class="chip"><i data-lucide="database"></i> Menyimpan histori (di browser)</span>
+          </div>
+        </div>
+      </div>
+
     </div>
+
+    <footer>
+      ArsCreative · 2026
+    </footer>
   </div>
 
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script>
-    // Initialize Icons
+    // Icons
     lucide.createIcons();
 
+    // HiveMQ config (punyamu)
     const HOST = "wss://5d06ddf4798c4491a76b7055abe6e283.s1.eu.hivemq.cloud:8884/mqtt";
     const USER = "wemos1";
     const PASS = "We123123";
@@ -147,79 +423,207 @@
     const TOPIC_HUM = "wemos1/iot/humidity";
     const TOPIC_WATER = "wemos1/iot/water";
 
+    // UI refs
+    const dot = document.getElementById("dot");
+    const statusText = document.getElementById("statusText");
+    const statusMeta = document.getElementById("statusMeta");
+
+    const humEl = document.getElementById("hum");
+    const tempEl = document.getElementById("temp");
+    const humTimeEl = document.getElementById("humTime");
+    const humBar = document.getElementById("humBar");
+
+    const waterEl = document.getElementById("water");
+    const waterBadge = document.getElementById("waterBadge");
+    const waterDevice = document.getElementById("waterDevice");
+    const waterTime = document.getElementById("waterTime");
+    const waterBar = document.getElementById("waterBar");
+
+    // Helpers
+    const fmtTime = () => new Date().toLocaleTimeString('id-ID', { hour12:false });
+    const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+
+    function parsePayload(rawText){
+      // toleransi payload JSON tidak standar: water:ON (tanpa kutip)
+      const fixed = rawText.replace(/:\s?(ON|OFF)([,\s}])/gi, ':"$1"$2');
+      try { return JSON.parse(fixed); } catch { return null; }
+    }
+
+    function normalizeOnOff(v){
+      // dukung ON/OFF, 1/0, true/false, "1"/"0"
+      const s = String(v ?? "").trim().toUpperCase();
+      if (s === "ON" || s === "TRUE" || s === "1") return "ON";
+      if (s === "OFF" || s === "FALSE" || s === "0") return "OFF";
+      return null;
+    }
+
+    function setConnectionState(state){
+      // state: "connecting" | "online" | "offline"
+      dot.classList.remove("on", "offline");
+      if (state === "online"){
+        dot.classList.add("on");
+        statusText.textContent = "Sistem Online";
+        statusMeta.textContent = "MQTT terhubung & subscribe";
+      } else if (state === "offline"){
+        dot.classList.add("offline");
+        statusText.textContent = "Offline";
+        statusMeta.textContent = "Koneksi terputus";
+      } else {
+        statusText.textContent = "Connecting…";
+        statusMeta.textContent = "Mencoba menghubungkan";
+      }
+    }
+
+    // Chart setup (no manual color setting requirement is only for python tool; here it's plain JS)
+    const MAX_POINTS = 60;
+    const chartCtx = document.getElementById("humChart");
+
+    const labels = [];
+    const humSeries = [];
+
+    const chart = new Chart(chartCtx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Humidity (%)',
+          data: humSeries,
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: true }
+        },
+        scales: {
+          y: {
+            suggestedMin: 0,
+            suggestedMax: 100,
+            ticks: { callback: (v) => v + '%' }
+          }
+        }
+      }
+    });
+
+    function pushChartPoint(h){
+      const t = fmtTime();
+      labels.push(t);
+      humSeries.push(h);
+
+      if (labels.length > MAX_POINTS){
+        labels.shift();
+        humSeries.shift();
+      }
+      chart.update();
+    }
+
+    function updateHumidityUI(h, t){
+      const time = fmtTime();
+
+      if (typeof h === "number" && !Number.isNaN(h)){
+        humEl.textContent = h.toFixed(1) + "%";
+        const w = clamp(h, 0, 100);
+        humBar.style.width = w + "%";
+        pushChartPoint(h);
+      } else {
+        humEl.textContent = "--";
+        humBar.style.width = "0%";
+      }
+
+      if (typeof t === "number" && !Number.isNaN(t)){
+        tempEl.textContent = t.toFixed(1) + "°C";
+      } else {
+        tempEl.textContent = "--";
+      }
+
+      humTimeEl.textContent = "Update: " + time;
+    }
+
+    function updateWaterUI(value, device){
+      const time = fmtTime();
+      const state = normalizeOnOff(value);
+
+      waterDevice.textContent = device || "Unknown";
+      waterTime.textContent = "Update: " + time;
+
+      waterEl.classList.remove("on", "off");
+      waterBadge.classList.remove("on", "off");
+      waterBar.classList.remove("on", "off");
+
+      if (state === "ON"){
+        waterEl.textContent = "ON";
+        waterEl.classList.add("on");
+        waterBadge.textContent = "POMPA ON";
+        waterBadge.classList.add("on");
+        waterBar.classList.add("on");
+      } else if (state === "OFF"){
+        waterEl.textContent = "OFF";
+        waterEl.classList.add("off");
+        waterBadge.textContent = "POMPA OFF";
+        waterBadge.classList.add("off");
+        waterBar.classList.add("off");
+      } else {
+        waterEl.textContent = value ?? "--";
+        waterBadge.textContent = "UNKNOWN";
+      }
+    }
+
+    // Connect MQTT
+    setConnectionState("connecting");
+
     const client = mqtt.connect(HOST, {
       username: USER,
       password: PASS,
       clientId: "web_client_" + Math.random().toString(16).slice(2),
+      clean: true,
+      connectTimeout: 10000,
+      reconnectPeriod: 2000
     });
 
-    const statusText = document.getElementById("status-text");
-    const statusContainer = document.getElementById("status-container");
-
     client.on("connect", () => {
-      statusText.textContent = "Sistem Online";
-      statusContainer.classList.add("status-connected");
-      client.subscribe([TOPIC_HUM, TOPIC_WATER]);
+      setConnectionState("online");
+      client.subscribe([TOPIC_HUM, TOPIC_WATER], { qos: 0 });
     });
 
     client.on("reconnect", () => {
-      statusText.textContent = "Reconnecting...";
-      statusContainer.classList.remove("status-connected");
+      setConnectionState("connecting");
     });
 
-    // Fungsi perbaikan tampilan ON/OFF
-    function updateWaterDisplay(value) {
-      const waterEl = document.getElementById("water");
-      const indicator = document.getElementById("water_indicator");
-      
-      // Mengatasi case-insensitive dan tipe data apa pun
-      let state = String(value).toUpperCase();
+    client.on("close", () => {
+      setConnectionState("offline");
+    });
 
-      if (state === "ON" || value === 1 || value === true) {
-        waterEl.textContent = "ON";
-        waterEl.className = "val status-on";
-        indicator.style.backgroundColor = "var(--danger)";
-      } else if (state === "OFF" || value === 0 || value === false) {
-        waterEl.textContent = "OFF";
-        waterEl.className = "val status-off";
-        indicator.style.backgroundColor = "var(--success)";
-      } else {
-        waterEl.textContent = value ?? "--";
-        waterEl.className = "val";
-      }
-    }
+    client.on("offline", () => {
+      setConnectionState("offline");
+    });
+
+    client.on("error", () => {
+      setConnectionState("offline");
+    });
 
     client.on("message", (topic, message) => {
-      let rawPayload = message.toString();
-      let obj;
-      
-      try {
-        // Trik: Jika JSON tidak standar (ON tanpa kutip), kita perbaiki stringnya sebelum parse
-        let fixedPayload = rawPayload.replace(/:\s?(ON|OFF)([,\s}])/gi, ':"$1"$2');
-        obj = JSON.parse(fixedPayload);
-      } catch (e) {
-        console.error("Payload error:", rawPayload);
-        obj = null;
-      }
+      const raw = message.toString();
+      const obj = parsePayload(raw);
 
-      const now = new Date().toLocaleTimeString('id-ID');
+      if (!obj) return;
 
       if (topic === TOPIC_HUM) {
-        const h = obj?.humidity ?? "--";
-        const t = obj?.temp ?? "--";
-        document.getElementById("hum").textContent = h + (h !== "--" ? "%" : "");
-        document.getElementById("hum_meta").textContent = `Suhu: ${t}°C | Update: ${now}`;
+        // dukung string/number
+        const h = (obj.humidity != null) ? Number(obj.humidity) : NaN;
+        const t = (obj.temp != null) ? Number(obj.temp) : NaN;
+        updateHumidityUI(h, t);
       }
 
       if (topic === TOPIC_WATER) {
-        const w = obj?.water ?? obj?.state;
-        updateWaterDisplay(w);
-        document.getElementById("water_meta").textContent = `Device: ${obj?.device ?? "Unknown"} | Update: ${now}`;
+        const w = (obj.water != null) ? obj.water : obj.state;
+        updateWaterUI(w, obj.device);
       }
     });
   </script>
-<footer style="margin-top: 40px; padding: 20px; color: var(--text-muted); font-size: 14px; text-align: center; border-top: 1px solid #e2e8f0; width: 100%; max-width: 900px;">
-  ArsCreative &middot; 2026
-</footer>
 </body>
 </html>
